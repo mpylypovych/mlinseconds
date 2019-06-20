@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from ..utils import solutionmanager as sm
 from ..utils import gridsearch as gs
+import numpy
 
 class SolutionModel(nn.Module):
     def __init__(self, input_size, output_size, solution):
@@ -17,12 +18,15 @@ class SolutionModel(nn.Module):
         self.hidden_size = solution.hidden_size
         self.linear1 = nn.Linear(input_size, self.hidden_size)
         self.linear2 = nn.Linear(self.hidden_size, output_size)
+        self.activator = solution.activator
 
     def forward(self, x):
         x = self.linear1(x)
-        x = torch.sigmoid(x)
+        x = self.activator(x)**4
+        
         x = self.linear2(x)
-        x = torch.sigmoid(x)
+        x = self.activator(x)
+        
         return x
 
     def calc_error(self, output, target):
@@ -36,13 +40,14 @@ class SolutionModel(nn.Module):
 class Solution():
     def __init__(self):
         # Control speed of learning
-        self.learning_rate = 0.00001
+        self.learning_rate = 3.55
         # Control number of hidden neurons
-        self.hidden_size = 1
-
+        self.hidden_size = 20
+        self.activator = torch.sigmoid
         # Grid search settings, see grid_search_tutorial
         self.learning_rate_grid = [0.001, 0.01, 0.1]
         self.hidden_size_grid = [1, 2, 3]
+        self.activator_grid = [torch.sigmoid, torch.tanh, torch.nn.functional.softsign, torch.nn.functional.elu]
         # grid search will initialize this field
         self.grid_search = None
         # grid search will initialize this field
@@ -58,7 +63,12 @@ class Solution():
         model = SolutionModel(train_data.size(1), train_target.size(1), self)
         # Optimizer used for training neural network
         sm.SolutionManager.print_hint("Hint[2]: Learning rate is too small", context.step)
-        optimizer = optim.SGD(model.parameters(), lr=self.learning_rate)
+        optimizer = optim.SGD(model.parameters(), lr=self.learning_rate, momentum=0.65)
+        #optimizer = optim.Adadelta(model.parameters(), lr=self.learning_rate, rho=0.9, eps=0.45*1e-04)
+        #
+
+        
+        
         while True:
             # Report step, so we know how many steps
             context.increase_step()
